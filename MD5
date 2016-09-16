@@ -1,0 +1,10 @@
+3d8eac83202ddde61caeb59a3196fef3 *DESCRIPTION
+b333aa09630ed8f3953d41d0052673d7 *NAMESPACE
+e0eecaea1a6560086a2407eba8b059c2 *R/BalanceCheck.r
+b1b91930484415c3711b1d7fad20d222 *data/smoking.rda
+3dfd25290ab4b7f39f06464181540896 *man/BalanceCheck-package.Rd
+ead6cd0c41326cda56f8441944c55110 *man/CrossMST.Rd
+7ed30c58fd509cf4f581ff6fa6fbc4e7 *man/CrossNN.Rd
+257f6fb44f333a7a39828d14a37bfcf2 *man/getD.Rd
+9fddb363b44d8185470cf8345a4c8dc2 *man/getR1R2.Rd
+d44cda0dce6631b7e03c3c839bb18303 *man/smokingDist.Rd

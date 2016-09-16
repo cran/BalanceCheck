@@ -1,0 +1,5 @@
+importFrom(ade4, mstree)
+importFrom(mvtnorm, pmvnorm)
+importFrom("stats", "as.dist")
+export(CrossMST, CrossNN)
+
