@@ -1,6 +1,6 @@
 Package: BalanceCheck
-Version: 0.1
-Date: 2016-9-11
+Version: 0.2
+Date: 2019-3-17
 Title: Balance Check for Multiple Covariates in Matched Observational
         Studies
 Author: Hao Chen and Dylan Small
@@ -10,6 +10,6 @@ Description: Two practical tests are provided for assessing whether multiple cov
 License: GPL (>= 2)
 Imports: ade4, mvtnorm
 NeedsCompilation: no
-Packaged: 2016-09-15 22:39:39 UTC; haochen
+Packaged: 2019-03-17 21:14:20 UTC; haochen
 Repository: CRAN
-Date/Publication: 2016-09-16 01:52:52
+Date/Publication: 2019-03-18 05:14:14 UTC

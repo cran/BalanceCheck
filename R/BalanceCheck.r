@@ -16,16 +16,13 @@ getR1R2 = function(E, treated.index){
 ## function CrossMST calculates the test statistic R_M and p-value for the new test
 ## if perm>0, also calculate permutation p-value
 
-CrossMST = function(distM,treated.index,perm=0){
+CrossMST = function(distM,treated.index,perm=0,k=1,discrete.correction=TRUE){
   n = length(treated.index)
   N = dim(distM)[1]
-  if (N!=(2*n)){
-    return("Control index wrong!")
-  }
   case.index = (1:N)[-treated.index]
   reorder = c(treated.index,case.index)
   distM2 = distM[reorder,reorder]
-  E = mstree(as.dist(distM2))
+  E = mstree(as.dist(distM2),k)
   Ebynode = vector("list", N)
   for (i in 1:N) Ebynode[[i]] = rep(0,0)
   for (i in 1:nrow(E)){
@@ -36,26 +33,39 @@ CrossMST = function(distM,treated.index,perm=0){
   nodedeg = rep(0,N)
   for (i in 1:N) nodedeg[i] = length(Ebynode[[i]])
   nEi = sum(nodedeg*(nodedeg-1))  # pair of nodes sharing a node * 2
-  mu = (N-2)/4
-  V = (nEi*N*(N-4)/(N-1) - (N-2)*(N-6))/16/(N-3)
-  V12 = (3*(N-2)-nEi*N/(N-1))*(N-2)/16/(N-3)
+  m = N-n
+  mu1 = k*n*(n-1)/N
+  mu2 = k*m*(m-1)/N
+  V1 = n*(n-1)*m*(m-1)/(N*(N-1)*(N-2)*(N-3))*((n-2)/(m-1)*(nEi+2*k*(N-1)-4*k^2*(N-1)^2/N)+k*(N-1)*(N-2*k)/N)
+  V2 = n*(n-1)*m*(m-1)/(N*(N-1)*(N-2)*(N-3))*((m-2)/(n-1)*(nEi+2*k*(N-1)-4*k^2*(N-1)^2/N)+k*(N-1)*(N-2*k)/N)
+  V12 = n*(n-1)*m*(m-1)/(N*(N-1)*(N-2)*(N-3))*(-nEi+k*(N-1)*(4*k*N-N-6*k)/N)
+
   temp = getR1R2(E,1:n)
-  Z1 = (temp$R1-mu)/sqrt(V)
-  Z2 = (temp$R2-mu)/sqrt(V)
-  rho = V12/V
+  R1 = temp$R1
+  R2 = temp$R2
+  
+  if (discrete.correction){
+    R1 = R1-0.5
+    R2 = R2-0.5
+  }
+  
+  Z1 = (R1-mu1)/sqrt(V1)
+  Z2 = (R2-mu2)/sqrt(V2)
+  rho = V12/sqrt(V1*V2)
   x = max(Z1,Z2)
-  # p1 = 2*pnorm(-x)
   p2 =  1-pmvnorm(upper=rep(x,2),mean=rep(0,2),corr=matrix(c(1,rho,rho,1),2))[1]
   if (perm<=0){
-    return(list(test.stat.R=max(temp$R1,temp$R2), test.stat.Z=x, pval.appr=p2))
+    return(list(test.stat.Z=x, pval.appr=p2))
   }else{
-    stat = rep(0,perm)
+    Rmat = Zmat = matrix(0,perm,2)
     for (i in 1:perm){
       temp2 = getR1R2(E,sample(1:N,n))
-      stat[i] = max(temp2$R1,temp2$R2)
+      Rmat[i,] = c(temp2$R1,temp2$R2)
+      Zmat[i,] = c(Rmat[i,]-c(mu1,mu2))/c(sqrt(V1),sqrt(V2))
     }
-    p3 = length(which(stat>=max(temp$R1,temp$R2)))/perm
-    return(list(test.stat.R=max(temp$R1,temp$R2), test.stat.Z=x, pval.appr=p2,  pval.perm=p3))
+    stat = apply(Zmat,1,max)
+    p3 = length(which(stat>=x))/perm
+    return(list(test.stat.Z=x, pval.appr=p2,  pval.perm=p3))
   }
 }
 
@@ -64,62 +74,89 @@ CrossMST = function(distM,treated.index,perm=0){
 ## function CrossNN calculates the test statistic and p-value for the new test
 ## if perm>0, also calculate permutation p-value
 
-CrossNN = function(distM,treated.index,perm=0){
+CrossNN = function(distM,treated.index,perm=0,k=1,discrete.correction=TRUE){
   n = length(treated.index)
   N = dim(distM)[1]
-  if (N!=(2*n)){
-    return("Control index wrong!")
-  }
-  case.index = (1:N)[-treated.index]
-  reorder = c(treated.index,case.index)
-  distM2 = distM[reorder,reorder]
-  diag(distM2) = max(distM)+10
-  nearest = apply(distM2, 1, which.min)
-  n = length(treated.index)
-  D11 = length(which(nearest[1:n]<=n))
-  D22 = length(which(nearest[(n+1):(2*n)]>n))
-  D12 = n-D11 # number of nodes in sample 1 whose nearest neighbor is from sample 2
-  D21 = n-D22
   
-  ### pick one arrow, pick another arrow, 2n*(2n-1) possibilities
-  
-  ## the number of possibilities that the two arrows share the endpoint
-  temp = as.vector(table(nearest))
-  k = max(temp)
-  share = 0
-  if (k>1){
-    for (i in 2:k){
-      share = share + choose(i,2)*length(which(temp==i))
+  if (k==1){
+    case.index = (1:N)[-treated.index]
+    reorder = c(treated.index,case.index)
+    distM2 = distM[reorder,reorder]
+    diag(distM2) = max(distM)+10
+    nearest = apply(distM2, 1, which.min)
+    n = length(treated.index)
+    D11 = length(which(nearest[1:n]<=n))
+    D22 = length(which(nearest[(n+1):N]>n))
+    m = N-n
+    
+    ### pick one arrow, pick another arrow, 2n*(2n-1) possibilities
+    
+    ## the number of possibilities that the two arrows share the endpoint
+    temp = as.vector(table(nearest))
+    a = max(temp)
+    share = 0
+    if (a>1){
+      for (i in 2:a){
+        share = share + choose(i,2)*length(which(temp==i))
+      }
     }
-  }
-  
-  ## number of mutual nearest neighbors * 2
-  mutual = length(which((nearest[nearest]-1:(2*n))==0))
-  
-  ## number of pairs that do not share any endpoint
-  pairs = 2*n*(2*n-1)-2*share-2*2*n+mutual
-  
-  ## E(D12^2)  (share: C1; pairs: N(N-3)-2C1+2C2)
-  p = n/(2*n-1)
-  EDsq = n*p + share/2*p + pairs*(n-1)/4/(2*n-3)*p
-  ED = n*p
-  VD = EDsq - ED^2
-  CovD = n*p + pairs*(n-1)/4/(2*n-3)*p - ED^2
-  Z12 = (D12-ED)/sqrt(VD)
-  Z21 = (D21-ED)/sqrt(VD)
-  rho = CovD/VD
-  x = min(Z12,Z21)
-  # p1 = 2*pnorm(x)
-  p2 =  1-pmvnorm(lower=rep(x,2),mean=rep(0,2),corr=matrix(c(1,rho,rho,1),2))[1]
-  if (perm<=0){
-    return(list(test.stat.D=min(D12,D21), test.stat.Z=x, pval.appr=p2))
+    
+    ## number of mutual nearest neighbors * 2
+    mutual = length(which((nearest[nearest]-1:N)==0))
   }else{
-    stat = rep(0,perm)
-    for (i in 1:perm){
-      stat[i] = min(getD(distM, sample(1:N,n)))
+    temp = getDk(distM, treated.index, k)
+    A = temp$A
+    D11 = temp$D11
+    D22 = temp$D22
+    temp2 = table(A)
+    id = as.numeric(row.names(temp2))
+    deg = rep(0,N)
+    deg[id] = temp2
+    share = (sum(deg^2)-sum(deg))/2
+    count = 0
+    for (i in 1:N){
+      ids = A[i,]
+      count = count + length(which(A[ids,]==i))
     }
-    p3 = length(which(stat<min(D12,D21)))/perm
-    return(list(test.stat.D=min(D12,D21), test.stat.Z=x, pval.appr=p2, pval.perm=p3))
+    mutual = count
+  }
+
+  ## C1: mutual/2; C2: share
+  
+  ED11 = k*n*(n-1)/(N-1)
+  ED22 = k*m*(m-1)/(N-1)
+  VD11 = n*m*(n-1)*(m-1)/(N*(N-1)*(N-2)*(N-3))*(k*N+mutual+(n-2)/(m-1)*(share*2+k*N-k^2*N)-2*k^2*N/(N-1))
+  VD22 = n*m*(n-1)*(m-1)/(N*(N-1)*(N-2)*(N-3))*(k*N+mutual+(m-2)/(n-1)*(share*2+k*N-k^2*N) -2*k^2*N/(N-1))
+  CovD = n*m*(n-1)*(m-1)/(N*(N-1)*(N-2)*(N-3))*(mutual-2*share+k^2*N*(N-3)/(N-1))
+  
+  if (discrete.correction){
+    D11 = D11-0.5
+    D22 = D22-0.5
+  }
+  
+  Z1 = (D11-ED11)/sqrt(VD11)
+  Z2 = (D22-ED22)/sqrt(VD22)
+  rho = CovD/sqrt(VD11*VD22)
+  x = max(Z1,Z2)
+  # p1 = 2*pnorm(x)
+  p2 =  1-pmvnorm(upper=rep(x,2),mean=rep(0,2),corr=matrix(c(1,rho,rho,1),2))[1]
+  if (perm<=0){
+    return(list(test.stat.Z=x, pval.appr=p2))
+  }else{
+    Dmat = Zmat = matrix(0,perm,2)
+    for (i in 1:perm){
+      if (k==1){
+        temp2 = getD(distM, sample(1:N,n))
+        Dmat[i,] = temp2
+      }else{
+        temp2 = getDk(distM, sample(1:N,n), k)
+        Dmat[i,] = c(temp2$D11, temp2$D22)
+      }
+      Zmat[i,] = (Dmat[i,]-c(ED11,ED22))/c(sqrt(VD11),sqrt(VD22))
+    }
+    stat = apply(Zmat,1,max)
+    p3 = length(which(stat>=x))/perm
+    return(list(test.stat.Z=x, pval.appr=p2, pval.perm=p3))
   }
 }
 
@@ -134,9 +171,25 @@ getD = function(distM, treated.index){
   nearest = apply(distM2, 1, which.min)
   n = length(treated.index)
   D11 = length(which(nearest[1:n]<=n))
-  D22 = length(which(nearest[(n+1):(2*n)]>n))
-  D12 = n-D11 # number of nodes in sample 1 whose nearest neighbor is from sample 2
-  D21 = n-D22
-  return(c(D12,D21))
+  D22 = length(which(nearest[(n+1):N]>n))
+  return(c(D11,D22))
+}
+
+getDk = function(distM, treated.index, k){
+  N = dim(distM)[1]
+  case.index = (1:N)[-treated.index]
+  reorder = c(treated.index,case.index)
+  distM2 = distM[reorder,reorder]
+  diag(distM2) = max(distM)+10
+  
+  A = matrix(0,N,k)
+  for (i in 1:N){
+    A[i,] = (sort(distM2[i,1:N], index.return=T)$ix)[1:k]
+  }
+  
+  n = length(treated.index)
+  D11 = length(which(A[1:n,]<=n))
+  D22 = length(which(A[(n+1):N,]>n))
+  return(list(A=A,D11=D11,D22=D22))
 }
 

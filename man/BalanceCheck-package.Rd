@@ -9,7 +9,7 @@ Hao Chen and Dylan Small
 Maintainer: Hao Chen (hxchen@ucdavis.edu)
 }
 \references{
-Chen, H. and Small, D. (2016) New multivariate tests for assessing covariate balance in matched observational studies.
+Chen, H. and Small, D. (2019) New multivariate tests for assessing covariate balance in matched observational studies.
 }
 
 \seealso{
